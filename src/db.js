@@ -4,6 +4,7 @@ const users = [
         name: "Tom",
         age: '23',
         occupation: "writer",
+        email: "oiuero@email.com"
 
     },
     {
@@ -11,6 +12,7 @@ const users = [
         name: "Jen",
         age: '23',
         occupation: "writer",
+        email: "nbnmb@email.com"
         
     },
     {
@@ -18,6 +20,7 @@ const users = [
         name: "Mark",
         age: '23',
         occupation: "writer",
+        email: "hjj56@email.com"
         
     }
 ]
@@ -27,21 +30,21 @@ const posts = [
         id: '2',
         title: "banana",
         body: "sldkfjlsk",
-        published: false,
+        published: true,
         author: '3'
     },
     {
         id: '3',
         title: "apple",
         body: "sldkfjlsk",
-        published: false,
+        published: true,
         author: '3'
     },
     {
         id: '7',
         title: "banana",
         body: "sldkfjlsk",
-        published: false,
+        published: true,
         author: '3'
     }
 ]

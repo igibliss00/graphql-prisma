@@ -50,7 +50,7 @@ const Mutation = {
 
         return user
     },
-    createPost(parent, args, { db }, info) {
+    createPost(parent, args, { db, pubsub }, info) {
         const userExist = db.users.some(user => user.id === args.input.author)
         if(!userExist) {
             throw new Error("User not found")
@@ -62,11 +62,21 @@ const Mutation = {
         }
 
         db.posts.push(post)
+        if (args.input.published) {
+            pubsub.publish( "post" , {
+                post: {
+                    mutation: "CREATED",
+                    data: post 
+                }
+            })
+        }
+
         return post
     },
-    updatePost(parent, args, { db }, info) {
+    updatePost(parent, args, { db, pubsub }, info) {
         const { id, input } = args
         const post = db.posts.find(post => post.id === id)
+        const originalPost = { ...post }
         if(!post) {
             throw new Error("Post doesn't exist")
         }
@@ -80,9 +90,62 @@ const Mutation = {
             post.published = input.published
         }
 
+        if (typeof input.published === "boolean") {
+            post.published = input.published
+            
+            if (originalPost.published && !post.published) {
+                pubsub.publish('post', {
+                    post: {
+                        mutation: 'DELETED',
+                        data: originalPost
+                    }
+                })
+            } else if (!originalPost.published && post.published) { 
+                pubsub.publish('post', {
+                    post: {
+                        mutation: 'CREATED',
+                        data: post
+                    }
+                })
+            } else if (originalPost.published && post.published) {
+                pubsub.publish('post', {
+                    post: {
+                        mutation: 'UPDATED',
+                        data: post
+                    }
+                })
+            }
+        } else if (post.published) {
+            pubsub.publish('post', {
+                post: {
+                    mutation: 'UPDATED',
+                    data: post
+                }
+            })
+        }
+
         return post
     },
-    createComment(parent, args, { db }, info) {
+    deletePost(parent, args, { db, pubsub }, info) {
+        const { id } = args
+        const postIndex = db.posts.findIndex(post => post.id === id)
+        if(postIndex === -1) {
+            throw new Error("Post does not exist!")
+        }
+        const [post] = db.posts.splice(postIndex, 1)
+        db.comments = db.comments.filter(comment => comment.post !== id)
+
+        if(post.published) {
+            pubsub.publish('post', {
+                post: {
+                    mutation: "DELETED",
+                    data: post
+                }
+            })
+        }
+        return post
+    },
+    createComment(parent, args, { db, pubsub }, info) {
         const emailTaken = db.users.some(user => {
             return user.id === args.input.author
         })
@@ -96,7 +159,49 @@ const Mutation = {
             ...args.input 
         }
         db.comments.push(comment)
+        // first is the channel second is the value we want to publish, which matches up with the subscription name in schema, using shorthand syntax
+        pubsub.publish(`comment ${args.input.post}`, { 
+            comment: {
+                mutation: "CREATED",
+                data: comment
+            }
+         })
         return comment
+    },
+    updateComment(parent, args, { db, pubsub }, info) {
+        const { id, input } = args
+        const comment = db.comments.find(comment => comment.id === id)
+        
+        if(!comment) {
+            throw new Error("Comment not found")
+        }
+
+        if (typeof input.text === 'string') {
+            comment.text = input.text
+        }
+
+        pubsub.publish(`comment ${args.id}`, {
+            comment: {
+                mutation: "UPDATED",
+                data: comment
+            }
+        })
+        return comment
+    },
+    deleteComment(parent, args , { db, pubsub }, info) {
+        const commentIndex = db.comments.findIndex(comment => comment.id === args.id)
+        if(commentIndex === -1) {
+            throw new Error("Comment not found")
+        }
+        //destructured because this obviates having to grab deletedComment from an array like so deletedComment[0]
+        const [deletedComment] = db.comments.splice(commentIndex, 1)
+        pubsub.publish(`comment ${deletedComment.post}`, {
+            comment: {
+                mutation: "DELETED",
+                data: deletedComment
+            }
+        })
+        return deletedComment
     }
 
 }
